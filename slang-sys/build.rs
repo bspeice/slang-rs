@@ -1,19 +1,38 @@
 extern crate bindgen;
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+fn do_link_env() -> Option<PathBuf> {
+	println!("cargo:rerun-if-env-changed=SLANG_DIR");
+	Some(env::var("SLANG_DIR").ok()?.into())
+}
+
+fn do_link_cmake() -> Option<PathBuf> {
+	let cmake_output = cmake::Config::new("./slang")
+		// https://github.com/shader-slang/slang/issues/5832#issuecomment-2533324982
+		.define("CMAKE_SKIP_INSTALL_RULES", "ON")
+		.build_target("slang")
+		.build();
+
+	for build_type in ["Debug", "Release"] {
+		let slang_dir = cmake_output.join("build").join(build_type);
+		if slang_dir.exists() {
+			return Some(slang_dir);
+		}
+	}
+
+	None
+}
 
 fn main() {
-	println!("cargo:rerun-if-env-changed=SLANG_DIR");
-	let slang_dir = env::var("SLANG_DIR").map(PathBuf::from).expect(
-		"Environment variable `SLANG_DIR` should be set to the directory of a Slang installation.",
-	);
+	println!("cargo:rerun-if-changed=build.rs");
 
-	let out_dir = env::var("OUT_DIR")
-		.map(PathBuf::from)
-		.expect("Couldn't determine output directory.");
-
-	link_libraries(&slang_dir);
+	let slang_dir = do_link_env()
+		.or_else(do_link_cmake)
+		.expect("Unable to locate slang");
+	println!("cargo:rustc-link-lib=dylib=slang");
+	println!("cargo:rustc-link-search=native={}", slang_dir.join("lib").display());
 
 	bindgen::builder()
 		.header(slang_dir.join("include/slang.h").to_str().unwrap())
@@ -40,19 +59,8 @@ fn main() {
 		.derive_copy(true)
 		.generate()
 		.expect("Couldn't generate bindings.")
-		.write_to_file(out_dir.join("bindings.rs"))
+		.write_to_file(format!("{}/bindings.rs", env::var("OUT_DIR").unwrap()))
 		.expect("Couldn't write bindings.");
-}
-
-fn link_libraries(slang_dir: &Path) {
-	let lib_dir = slang_dir.join("lib");
-
-	if !lib_dir.is_dir() {
-		panic!("Couldn't find the `lib` subdirectory in the Slang installation directory.")
-	}
-
-	println!("cargo:rustc-link-search=native={}", lib_dir.display());
-	println!("cargo:rustc-link-lib=dylib=slang");
 }
 
 #[derive(Debug)]
