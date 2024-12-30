@@ -54,6 +54,7 @@ fn main() {
 		})
 		.constified_enum("SlangProfileID")
 		.constified_enum("SlangCapabilityID")
+		.new_type_alias("SlangResult")
 		.vtable_generation(true)
 		.layout_tests(false)
 		.derive_copy(true)

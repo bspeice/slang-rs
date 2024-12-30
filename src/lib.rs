@@ -1,6 +1,7 @@
 pub mod reflection;
 
 use std::ffi::{CStr, CString};
+use std::fmt::{Debug, Display, Formatter};
 use std::ptr::{null, null_mut};
 
 use slang_sys as sys;
@@ -29,33 +30,28 @@ const fn uuid(data1: u32, data2: u16, data3: u16, data4: [u8; 8]) -> UUID {
 	}
 }
 
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
-	Code(sys::SlangResult),
-	Blob(Blob),
-}
+	#[error("underlying library error: `{0}`")]
+	Slang(sys::SlangResult),
 
-impl std::fmt::Debug for Error {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Error::Code(code) => write!(f, "{}", code),
-			Error::Blob(blob) => write!(f, "{}", blob.as_str().unwrap()),
-		}
-	}
+	#[error("blob")]
+	Blob(Blob),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) fn succeeded(result: sys::SlangResult) -> bool {
-	result >= 0
+	result.0 >= 0
 }
 
 fn result_from_blob(code: sys::SlangResult, blob: *mut sys::slang_IBlob) -> Result<()> {
-	if code < 0 {
+	if succeeded(code) {
+		Ok(())
+	} else {
 		Err(Error::Blob(Blob(IUnknown(
 			std::ptr::NonNull::new(blob as *mut _).unwrap(),
 		))))
-	} else {
-		Ok(())
 	}
 }
 
@@ -124,6 +120,18 @@ impl Drop for IUnknown {
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct Blob(IUnknown);
+
+impl Debug for Blob {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		write!(f, "ptr={:p}", self.0.0)
+	}
+}
+
+impl Display for Blob {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		Debug::fmt(&self, f)
+	}
+}
 
 unsafe impl Interface for Blob {
 	type Vtable = sys::IBlobVtable;

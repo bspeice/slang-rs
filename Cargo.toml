@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 slang-sys = { path = "slang-sys" }
+thiserror = "2.0"
 
 [workspace]
 members = [

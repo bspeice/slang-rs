@@ -3,7 +3,7 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use std::ffi::{c_char, c_int, c_void};
-
+use std::fmt::{Display, Formatter};
 // Based on Slang version 2024.14.5
 
 #[repr(C)]
@@ -134,4 +134,14 @@ pub struct IModuleVtable {
 	pub getDependencyFileCount: unsafe extern "C" fn(*mut c_void) -> SlangInt32,
 	pub getDependencyFilePath: unsafe extern "C" fn(*mut c_void, index: SlangInt32) -> *const c_char,
 	pub getModuleReflection: unsafe extern "C" fn(*mut c_void) -> *mut slang_DeclReflection,
+}
+
+impl Display for SlangResult {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		if self.0 > 0 {
+			write!(f, "success")
+		} else {
+			write!(f, "failure")
+		}
+	}
 }
