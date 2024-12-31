@@ -90,7 +90,7 @@ impl Shader {
 		)
 	}
 
-	fn type_layout(&self, ty: &Type, rules: sys::SlangLayoutRules) -> Option<&TypeLayout> {
+	pub fn type_layout(&self, ty: &Type, rules: sys::SlangLayoutRules) -> Option<&TypeLayout> {
 		rcall!(
 			spReflection_GetTypeLayout(self, ty as *const _ as *mut _, rules)
 				as Option<&TypeLayout>

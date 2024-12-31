@@ -36,7 +36,7 @@ pub enum Error {
 	Slang(sys::SlangResult),
 
 	#[error("blob")]
-	Blob(Blob),
+	Blob,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -45,13 +45,11 @@ pub(crate) fn succeeded(result: sys::SlangResult) -> bool {
 	result.0 >= 0
 }
 
-fn result_from_blob(code: sys::SlangResult, blob: *mut sys::slang_IBlob) -> Result<()> {
+fn result_from_blob(code: sys::SlangResult, _blob: *mut sys::slang_IBlob) -> Result<()> {
 	if succeeded(code) {
 		Ok(())
 	} else {
-		Err(Error::Blob(Blob(IUnknown(
-			std::ptr::NonNull::new(blob as *mut _).unwrap(),
-		))))
+		Err(Error::Blob)
 	}
 }
 
@@ -232,10 +230,10 @@ impl Session {
 		let module = vcall!(self, loadModule(name.as_ptr(), &mut diagnostics));
 
 		if module.is_null() {
-			let blob = Blob(IUnknown(
+			let _blob = Blob(IUnknown(
 				std::ptr::NonNull::new(diagnostics as *mut _).unwrap(),
 			));
-			Err(Error::Blob(blob))
+			Err(Error::Blob)
 		} else {
 			let module = Module(IUnknown(std::ptr::NonNull::new(module as *mut _).unwrap()));
 			unsafe { (module.as_unknown().vtable().ISlangUnknown_addRef)(module.as_raw()) };
@@ -319,9 +317,7 @@ impl ComponentType {
 		let ptr = vcall!(self, getLayout(target, &mut diagnostics));
 
 		if ptr.is_null() {
-			Err(Error::Blob(Blob(IUnknown(
-				std::ptr::NonNull::new(diagnostics as *mut _).unwrap(),
-			))))
+			Err(Error::Blob)
 		} else {
 			Ok(unsafe { &*(ptr as *const _) })
 		}
@@ -714,6 +710,14 @@ impl OptionsBuilder {
 
 #[cfg(test)]
 mod tests {
+	use crate::Error;
+
 	#[test]
 	fn compiles() {}
+
+	#[test]
+	fn can_send_error() {
+		let lambda = |e: &(dyn std::error::Error + Send + Sync)| {};
+		lambda(&Error::Blob);
+	}
 }
